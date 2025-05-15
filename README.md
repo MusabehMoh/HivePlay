@@ -1,8 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HivePlay
+
+A YouTube media player built with Next.js, with Redis caching and yt-dlp integration, all packaged into a single Docker container.
 
 ## Getting Started
 
-First, run the development server:
+### Docker Deployment (Recommended)
+
+This project is fully dockerized, including Redis and yt-dlp, making it easy to deploy anywhere.
+
+#### On Windows PC
+
+```powershell
+# Build and start all containers
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all containers
+docker-compose down
+```
+
+For detailed Windows instructions, see [WINDOWS-GUIDE.md](WINDOWS-GUIDE.md).
+
+#### For Khadas or other ARM devices
+
+Use the specialized ARM build script:
+
+```bash
+chmod +x build-for-arm.sh
+./build-for-arm.sh
+docker-compose up -d
+```
+
+For detailed Docker instructions, see [DOCKER-GUIDE.md](DOCKER-GUIDE.md).
+
+### Development Mode (Alternative)
+
+If you prefer to run the development server directly:
 
 ```bash
 npm run dev
@@ -16,18 +51,27 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- YouTube audio and video playback
+- Multiple backends (yt-dlp, ytdl-core)
+- Redis caching for better performance
+- Responsive UI with mobile support
+- Docker support for easy deployment
+- ARM compatibility (Khadas, Raspberry Pi, etc.)
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [yt-dlp Documentation](https://github.com/yt-dlp/yt-dlp) - learn about yt-dlp features and options.
+- [Redis Documentation](https://redis.io/documentation) - learn about Redis.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Requirements
+
+- Docker and Docker Compose (for containerized deployment)
+- Node.js 18+ (only for local development)
+- yt-dlp (installed automatically in Docker)
+- Redis (included in Docker)
 
 ## Deploy on Vercel
 

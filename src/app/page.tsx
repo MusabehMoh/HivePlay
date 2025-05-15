@@ -1,103 +1,527 @@
-import Image from "next/image";
+'use client';
+import { useState, useEffect, useRef, useCallback } from "react";
+import AudioPlayer from "./components/AudioPlayer";
+import SearchResults from "./components/SearchResults";
+import LoadingSpinner from "./components/LoadingSpinner";
+import RecentSearches from "./components/RecentSearches";
+import Playlist from "./components/Playlist";
+import PlaylistManager from "./components/PlaylistManager";
+import Toast from './components/Toast';
+import CacheStats from './components/CacheStats';
+import { FaSearch, FaTimes, FaChartBar } from "react-icons/fa";
+
+const MAX_RECENT_SEARCHES = 5;
+
+let toastIdCounter = 0;
+const generateUniqueId = () => {
+  toastIdCounter += 1;
+  return `toast-${Date.now()}-${toastIdCounter}`;
+};
+
+interface SearchError {
+  message: string;
+  code?: string;
+}
+
+interface SearchResult {
+  id: { videoId: string };
+  snippet: {
+    title: string;
+    thumbnails: {
+      default: {
+        url: string;
+      };
+      medium?: {
+        url: string;
+      };
+    };
+    channelTitle: string;
+  };
+}
+
+interface PlaylistItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  channelTitle: string;
+}
+
+interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'success' | 'error';
+}
+
+interface Playlists {
+  [playlistName: string]: PlaylistItem[];
+}
+
+const DEFAULT_PLAYLIST_NAME = "Default Playlist";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<SearchError | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [playlists, setPlaylists] = useState<Playlists>({ [DEFAULT_PLAYLIST_NAME]: [] });
+  const [activePlaylistName, setActivePlaylistName] = useState<string>(DEFAULT_PLAYLIST_NAME);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showCacheStats, setShowCacheStats] = useState(false);
+  const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSuggestionRequestRef = useRef<number>(0);
+  const SUGGESTION_COOLDOWN = 2000;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const getActivePlaylistItems = useCallback(() => {
+    return playlists[activePlaylistName] || [];
+  }, [playlists, activePlaylistName]);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    const id = generateUniqueId();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  useEffect(() => {
+    if (error) {
+      showToast(error.message, 'error');
+    }
+  }, [error, showToast]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('recentSearches');
+    if (saved) {
+      setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedPlaylists = localStorage.getItem('playlists');
+    const savedActivePlaylist = localStorage.getItem('activePlaylistName');
+
+    if (savedPlaylists) {
+      try {
+        const parsedPlaylists = JSON.parse(savedPlaylists);
+        if (Object.keys(parsedPlaylists).length === 0) {
+          setPlaylists({ [DEFAULT_PLAYLIST_NAME]: [] });
+          setActivePlaylistName(DEFAULT_PLAYLIST_NAME);
+        } else {
+          setPlaylists(parsedPlaylists);
+          setActivePlaylistName(savedActivePlaylist && parsedPlaylists[savedActivePlaylist] ? savedActivePlaylist : Object.keys(parsedPlaylists)[0]);
+        }
+      } catch (e) {
+        console.error("Failed to parse playlists from localStorage", e);
+        setPlaylists({ [DEFAULT_PLAYLIST_NAME]: [] });
+        setActivePlaylistName(DEFAULT_PLAYLIST_NAME);
+      }
+    } else {
+      setPlaylists({ [DEFAULT_PLAYLIST_NAME]: [] });
+      setActivePlaylistName(DEFAULT_PLAYLIST_NAME);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('playlists', JSON.stringify(playlists));
+    localStorage.setItem('activePlaylistName', activePlaylistName);
+  }, [playlists, activePlaylistName]);
+
+  const dispatchCacheEvent = (type: string, fromCache: boolean, time: number, query?: string) => {
+    const event = new CustomEvent('redis-cache-hit', {
+      detail: { type, fromCache, time, query }
+    });
+    window.dispatchEvent(event);
+  };
+
+  const handleSearch = async (e: React.FormEvent | null, overrideQuery?: string, forceRefresh = false) => {
+    if (e) e.preventDefault();
+    const queryToUse = overrideQuery || searchQuery;
+    if (!queryToUse.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    const startTime = performance.now();
+
+    try {
+      const url = new URL(`/api/alternative/search/ytsearch`, window.location.origin);
+      url.searchParams.append('query', queryToUse);
+      url.searchParams.append('maxResults', '10');
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch results');
+      }
+
+      const data = await response.json();
+
+      if (data.results) {
+        setSearchResults(data.results);
+      } else if (Array.isArray(data)) {
+        setSearchResults(data);
+      } else {
+        setSearchResults([]);
+        throw new Error('Unexpected API response format');
+      }
+
+      const endTime = performance.now();
+      dispatchCacheEvent('Search', data.fromCache, endTime - startTime, queryToUse);
+
+      addToRecentSearches(queryToUse);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError({ message: errorMessage });
+      showToast(errorMessage, 'error');
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddToPlaylist = (result: SearchResult, targetPlaylistName: string = activePlaylistName) => {
+    const newItem: PlaylistItem = {
+      id: result.id.videoId,
+      title: result.snippet.title,
+      thumbnail: result.snippet.thumbnails.medium?.url || '',
+      channelTitle: result.snippet.channelTitle,
+    };
+
+    // Check if item exists in the target playlist *before* calling setPlaylists
+    const currentPlaylist = playlists[targetPlaylistName] || [];
+    const itemExists = currentPlaylist.some(item => item.id === newItem.id);
+
+    if (itemExists) {
+      showToast(`'${newItem.title}' is already in the '${targetPlaylistName}' playlist`, 'error');
+      return; // Exit early if item already exists
+    }
+
+    // Show success toast *before* updating state
+    showToast(`Added '${newItem.title}' to '${targetPlaylistName}'`, 'success');
+
+    // Update the playlists state
+    setPlaylists(prev => {
+      // We already confirmed the item doesn't exist, so just add it
+      const updatedPlaylist = [...(prev[targetPlaylistName] || []), newItem];
+      return {
+        ...prev,
+        [targetPlaylistName]: updatedPlaylist
+      };
+    });
+  };
+
+  const handleRemoveFromPlaylist = (videoId: string) => {
+    setPlaylists(prev => {
+      const currentPlaylist = prev[activePlaylistName] || [];
+      const updatedPlaylist = currentPlaylist.filter(item => item.id !== videoId);
+
+      if (videoId === currentVideoId && updatedPlaylist.length < currentPlaylist.length) {
+        setCurrentVideoId(null);
+        setIsPlaying(false);
+      }
+
+      return {
+        ...prev,
+        [activePlaylistName]: updatedPlaylist
+      };
+    });
+  };
+
+  const handleMoveUp = (videoId: string) => {
+    setPlaylists(prev => {
+      const currentPlaylist = prev[activePlaylistName] || [];
+      const index = currentPlaylist.findIndex(item => item.id === videoId);
+      if (index === -1 || index === 0) return prev;
+
+      const newPlaylist = [...currentPlaylist];
+      [newPlaylist[index - 1], newPlaylist[index]] = [newPlaylist[index], newPlaylist[index - 1]];
+
+      return { ...prev, [activePlaylistName]: newPlaylist };
+    });
+  };
+
+  const handleMoveDown = (videoId: string) => {
+    setPlaylists(prev => {
+      const currentPlaylist = prev[activePlaylistName] || [];
+      const index = currentPlaylist.findIndex(item => item.id === videoId);
+      if (index === -1 || index === currentPlaylist.length - 1) return prev;
+
+      const newPlaylist = [...currentPlaylist];
+      [newPlaylist[index + 1], newPlaylist[index]] = [newPlaylist[index], newPlaylist[index + 1]];
+
+      return { ...prev, [activePlaylistName]: newPlaylist };
+    });
+  };
+
+  const createPlaylist = (name: string) => {
+    if (!name.trim()) {
+      showToast("Playlist name cannot be empty", "error");
+      return false;
+    }
+    if (playlists[name]) {
+      showToast(`Playlist "${name}" already exists`, "error");
+      return false;
+    }
+    setPlaylists(prev => ({ ...prev, [name]: [] }));
+    setActivePlaylistName(name);
+    showToast(`Playlist "${name}" created`, "success");
+    return true;
+  };
+
+  const deletePlaylist = (name: string) => {
+    if (Object.keys(playlists).length <= 1) {
+      showToast("Cannot delete the last playlist", "error");
+      return;
+    }
+    if (!playlists[name]) return;
+
+    setPlaylists(prev => {
+      const updatedPlaylists = { ...prev };
+      delete updatedPlaylists[name];
+      return updatedPlaylists;
+    });
+
+    if (activePlaylistName === name) {
+      setActivePlaylistName(Object.keys(playlists)[0] || DEFAULT_PLAYLIST_NAME);
+    }
+    showToast(`Playlist "${name}" deleted`, "success");
+  };
+
+  const renamePlaylist = (oldName: string, newName: string) => {
+    if (!newName.trim()) {
+      showToast("Playlist name cannot be empty", "error");
+      return false;
+    }
+    if (oldName === newName) return true;
+    if (playlists[newName]) {
+      showToast(`Playlist "${newName}" already exists`, "error");
+      return false;
+    }
+    if (!playlists[oldName]) return false;
+
+    setPlaylists(prev => {
+      const updatedPlaylists = { ...prev };
+      updatedPlaylists[newName] = updatedPlaylists[oldName];
+      delete updatedPlaylists[oldName];
+      return updatedPlaylists;
+    });
+
+    if (activePlaylistName === oldName) {
+      setActivePlaylistName(newName);
+    }
+    showToast(`Playlist "${oldName}" renamed to "${newName}"`, "success");
+    return true;
+  };
+
+  const handleVideoSelect = (videoId: string) => {
+    console.log(`[Page] handleVideoSelect called with videoId: ${videoId}`);
+    if (videoId === currentVideoId) {
+      console.log(`[Page] Same video selected. Ensuring isPlaying is true.`);
+      if (!isPlaying) {
+        setIsPlaying(true);
+      }
+      return;
+    }
+    console.log(`[Page] New video selected. Setting videoId and isPlaying=true.`);
+    setCurrentVideoId(videoId);
+    setIsPlaying(true);
+  };
+
+  const handleTogglePlayPause = (videoId: string | null) => {
+    if (!videoId) return;
+    console.log(`[Page] handleTogglePlayPause called for videoId: ${videoId}`);
+    if (videoId === currentVideoId) {
+      setIsPlaying(prev => {
+        console.log(`[Page] Toggling isPlaying for current video. New state: ${!prev}`);
+        return !prev;
+      });
+    } else {
+      console.log(`[Page] Toggling play/pause for a different video. Selecting it and setting isPlaying=true.`);
+      setCurrentVideoId(videoId);
+      setIsPlaying(true);
+    }
+  };
+
+  const handleVideoEnd = () => {
+    const activePlaylist = getActivePlaylistItems();
+    if (activePlaylist.length === 0) {
+      setIsPlaying(false);
+      return;
+    }
+
+    const currentIndex = activePlaylist.findIndex(item => item.id === currentVideoId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % activePlaylist.length;
+    setCurrentVideoId(activePlaylist[nextIndex].id);
+    setIsPlaying(true);
+  };
+
+  const handlePrevious = () => {
+    const activePlaylist = getActivePlaylistItems();
+    if (activePlaylist.length === 0) return;
+
+    const currentIndex = activePlaylist.findIndex(item => item.id === currentVideoId);
+    if (currentIndex === -1) {
+      setCurrentVideoId(activePlaylist[0].id);
+      setIsPlaying(true);
+      return;
+    }
+
+    const previousIndex = (currentIndex - 1 + activePlaylist.length) % activePlaylist.length;
+    setCurrentVideoId(activePlaylist[previousIndex].id);
+    setIsPlaying(true);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
+  const handleRecentSearchSelect = (query: string) => {
+    setSearchQuery(query);
+    handleSearch(null, query);
+  };
+
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('recentSearches');
+  };
+
+  const addToRecentSearches = (query: string) => {
+    const updated = [query, ...recentSearches.filter(s => s !== query)]
+      .slice(0, MAX_RECENT_SEARCHES);
+    setRecentSearches(updated);
+    localStorage.setItem('recentSearches', JSON.stringify(updated));
+  };
+
+  return (
+    <div className="min-h-screen pb-28">
+      <div className="sticky top-0 z-10 bg-spotify-dark/95 backdrop-blur-md px-4 py-4 shadow-lg">
+        <div className="max-w-7xl mx-auto flex gap-4 items-center">
+          <div className="relative flex-grow max-w-2xl">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch(null);
+                }
+              }}
+              placeholder="Search for songs..."
+              className="w-full px-4 py-3 bg-spotify-dark-base text-white rounded-full 
+                focus:outline-none focus:ring-2 focus:ring-spotify-green 
+                placeholder:text-gray-500 pr-20"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="p-2 text-gray-400 hover:text-white transition-colors"
+                  aria-label="Clear search"
+                >
+                  <FaTimes />
+                </button>
+              )}
+              <button
+                onClick={() => handleSearch(null)}
+                className="p-2 text-gray-400 hover:text-white transition-colors"
+                aria-label="Search"
+              >
+                <FaSearch />
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCacheStats(!showCacheStats)}
+            className={`p-2 rounded-full ${showCacheStats ? 'bg-spotify-green text-black' : 'text-gray-400 hover:text-white'}`}
+            aria-label="Toggle cache statistics"
+            title="Toggle Redis cache statistics"
           >
-            Read our docs
-          </a>
+            <FaChartBar />
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="lg:col-span-2 xl:col-span-3 space-y-6">
+            {recentSearches.length > 0 && (
+              <RecentSearches
+                searches={recentSearches}
+                onSelect={handleRecentSearchSelect}
+                onClear={clearRecentSearches}
+              />
+            )}
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <LoadingSpinner />
+              </div>
+            ) : searchResults.length > 0 ? (
+              <SearchResults
+                results={searchResults}
+                selectedVideoId={currentVideoId}
+                onSelect={handleVideoSelect}
+                onAddToPlaylist={handleAddToPlaylist}
+                playlists={playlists}
+                activePlaylistName={activePlaylistName}
+                isPlaying={isPlaying}
+                onTogglePlayPause={handleTogglePlayPause}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <h2 className="text-2xl font-bold text-white mb-4">Welcome to YT Player</h2>
+                <p className="text-gray-400">Search for your favorite songs to get started</p>
+              </div>
+            )}
+          </div>
+          <div className="lg:col-span-1 space-y-4">
+            <PlaylistManager
+              playlists={playlists}
+              activePlaylistName={activePlaylistName}
+              setActivePlaylist={setActivePlaylistName}
+              createPlaylist={createPlaylist}
+              deletePlaylist={deletePlaylist}
+              renamePlaylist={renamePlaylist}
+            />
+            <Playlist
+              items={getActivePlaylistItems()}
+              playlistName={activePlaylistName}
+              currentVideoId={currentVideoId}
+              isPlaying={isPlaying}
+              onPlay={handleTogglePlayPause}
+              onRemove={handleRemoveFromPlaylist}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+            />
+          </div>
+        </div>
+      </div>
+
+      {currentVideoId && (
+        <AudioPlayer
+          videoId={currentVideoId}
+          onEnded={handleVideoEnd}
+          onPrevious={handlePrevious}
+          isPlaying={isPlaying}
+          onTogglePlay={() => handleTogglePlayPause(currentVideoId)}
+        />
+      )}
+
+      <CacheStats isVisible={showCacheStats} />
+
+      <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => removeToast(toast.id)}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        ))}
+      </div>
     </div>
   );
 }
