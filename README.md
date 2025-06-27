@@ -1,52 +1,109 @@
-# HivePlay
+# HivePlay 🎵
 
-A YouTube media player built with Next.js, with Redis caching and yt-dlp integration, all packaged into a single Docker container.
+A modern YouTube music streaming platform built with Next.js, featuring advanced search suggestions with thumbnails, Redis caching, and yt-dlp integration for high-quality audio streaming.
 
-## Prerequisites
+![HivePlay](https://img.shields.io/badge/HivePlay-Music_Streaming-green?style=for-the-badge)
+![Next.js](https://img.shields.io/badge/Next.js-15.3-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=for-the-badge&logo=docker)
+
+## ✨ Features
+
+### 🎵 **Core Music Experience**
+- **High-Quality Audio Streaming** - Powered by yt-dlp with fallback to ytdl-core
+- **Smart Search** - Intelligent search suggestions with real thumbnails
+- **Audio Player** - Modern player with progress tracking and controls
+- **Playlist Management** - Create and manage custom playlists
+- **Recent Searches** - Quick access to your recent music searches
+
+### 🖼️ **Visual Search Suggestions**
+- **Real Thumbnails** - Display actual YouTube video thumbnails in suggestions
+- **Smart Categorization** - Artists, songs, and generic suggestions with type indicators
+- **Visual Icons** - Color-coded icons (🎤 Artists, 🎵 Songs, 🔍 Generic)
+- **Duplicate Prevention** - Intelligent filtering to avoid duplicate suggestions
+
+### ⚡ **Performance & Caching**
+- **Redis Caching** - 1-week audio cache for instant playback
+- **Search Cache** - 5-minute suggestion caching for faster responses
+- **Optimized Streaming** - Range request support for efficient audio delivery
+- **Background Processing** - Non-blocking audio downloads and caching
+
+### 🎨 **Modern UI/UX**
+- **Spotify-Inspired Design** - Dark theme with green accents
+- **Responsive Layout** - Works perfectly on desktop, tablet, and mobile
+- **Keyboard Navigation** - Arrow keys and Enter support in suggestions
+- **Loading States** - Beautiful loading animations and progress indicators
+
+### 🐳 **Deployment Ready**
+- **Docker Support** - Complete containerization with docker-compose
+- **ARM Compatibility** - Khadas, Raspberry Pi, and other ARM devices
+- **Production Optimized** - Multi-stage builds and security best practices
+- **Easy Setup** - One-command deployment with Docker Compose
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
-- (Optional, for development) [Node.js 18+](https://nodejs.org/)
+- (Optional, for development) [Node.js 20+](https://nodejs.org/)
 - Git (to clone the repository)
 
-## Installation & Quick Start
+### Installation
 
 1. **Clone the repository:**
-   ```powershell
+   ```bash
    git clone https://github.com/MusabehMoh/HivePlay.git
    cd HivePlay
    ```
 
-2. **Build and start the app with Docker Compose:**
-   ```powershell
+2. **Build and start with Docker Compose:**
+   ```bash
    docker-compose up -d
    ```
 
-3. **Open your browser:**
-   - On your PC: [http://localhost:3000](http://localhost:3000)
-   - On your phone or another device: [http://<your-pc-ip>:3000](http://<your-pc-ip>:3000)
-     - Find your PC's IP with `ipconfig` in PowerShell (look for `IPv4 Address`).
-     - Make sure your firewall allows connections on port 3000.
+3. **Access HivePlay:**
+   - **Local:** [http://localhost:3000](http://localhost:3000)
+   - **Network:** `http://<your-ip>:3000` (find IP with `ipconfig` on Windows)
 
-4. **Stop the app:**
-   ```powershell
+4. **Stop the application:**
+   ```bash
    docker-compose down
    ```
 
-For detailed Windows instructions, see [WINDOWS-GUIDE.md](WINDOWS-GUIDE.md).
-For ARM devices (Khadas, Raspberry Pi, etc.), see [DOCKER-GUIDE.md](DOCKER-GUIDE.md) and use the `build-for-arm.sh` script.
+## 🛠️ Development Setup
 
-## Features
+For local development without Docker:
 
-- YouTube audio and video playback
-- Multiple backends (yt-dlp, ytdl-core)
-- Redis caching for better performance
-- Responsive UI with mobile support
-- Docker support for easy deployment
-- ARM compatibility (Khadas, Raspberry Pi, etc.)
+```bash
+# Install dependencies
+npm install
 
-## Environment Variables
+# Start Redis (required for caching)
+docker run -d -p 6379:6379 redis:alpine
 
-HivePlay uses several environment variables for configuration. Most are set automatically in Docker, but you may want to customize them for local development or advanced deployments.
+# Start development server
+npm run dev
+```
+
+## 📱 Usage
+
+### Search & Discovery
+1. **Type** in the search box to see real-time suggestions with thumbnails
+2. **Click** on suggestions or press Enter to search
+3. **Browse** results with beautiful thumbnails and metadata
+4. **Play** any track with one click
+
+### Playlists
+1. **Create** playlists from the sidebar
+2. **Add songs** using the + button on any track
+3. **Manage** playlists with edit/delete options
+4. **Play** entire playlists seamlessly
+
+### Audio Features
+- **High-Quality Streaming** - Automatic quality selection
+- **Progress Tracking** - See playback progress and duration
+- **Caching** - Songs load instantly after first play
+- **Range Requests** - Efficient streaming with seeking support
 
 ### Main Variables
 

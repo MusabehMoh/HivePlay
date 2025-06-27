@@ -6,12 +6,13 @@ import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 import { createClient } from 'redis';
+import { getYtDlpPath } from '../../../../services/alternative/ytdlp-locator';
 
 const unlinkAsync = promisify(fs.unlink);
 
 export const dynamic = 'force-dynamic';
 
-// One week in seconds - increased from 1 hour
+// One week in seconds - increased from 1 hour  
 const DEFAULT_AUDIO_CACHE_TTL = 604800; 
 
 async function getAudioBufferFromRedis(videoId: string): Promise<Buffer | null> {
@@ -62,10 +63,20 @@ async function streamWithYtdlCore(videoId: string): Promise<Response> {
   });
 }
 
-function streamWithYtDlp(videoId: string): Response {
+async function streamWithYtDlp(videoId: string): Promise<Response> {
   console.log('[HybridStream] Falling back to yt-dlp...');
+  
+  // Get the yt-dlp executable path
+  const ytDlpPath = await getYtDlpPath();
+  if (!ytDlpPath) {
+    console.error('[HybridStream] yt-dlp executable not found');
+    return new Response('yt-dlp not found', { status: 500 });
+  }
+  
+  console.log('[HybridStream] Using yt-dlp at:', ytDlpPath);
+  
   let closed = false;
-  const ytDlp = spawn('yt-dlp', [
+  const ytDlp = spawn(ytDlpPath, [
     '-f', '140', // m4a audio
     '-o', '-', // output to stdout
     '--quiet',
@@ -126,8 +137,16 @@ async function streamWithYtDlpRange(videoId: string, range: string | null): Prom
     // Download audio to buffer
     const tempDir = os.tmpdir();
     const tempFile = path.join(tempDir, `yt-hybrid-${videoId}-${Date.now()}.m4a`);
+    
+    // Get the yt-dlp executable path
+    const ytDlpPath = await getYtDlpPath();
+    if (!ytDlpPath) {
+      console.error('[HybridStream] yt-dlp executable not found');
+      return new Response('yt-dlp not found', { status: 500 });
+    }
+    
     await new Promise<void>((resolve, reject) => {
-      const ytDlp = spawn('yt-dlp', [
+      const ytDlp = spawn(ytDlpPath, [
         '-f', '140',
         '-o', tempFile,
         '--quiet',
@@ -194,7 +213,7 @@ export async function GET(req: NextRequest) {
     console.warn('[HybridStream] ytdl-core failed:', ytdlError.message);
     try {
       // Fallback to yt-dlp (no range)
-      return streamWithYtDlp(videoId);
+      return await streamWithYtDlp(videoId);
     } catch (ytDlpError: any) {
       console.error('[HybridStream] Both ytdl-core and yt-dlp failed:', ytDlpError);
       return new Response(`Streaming failed: ${ytDlpError.message || 'Unknown error'}`, { status: 500 });

@@ -21,7 +21,7 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: "YouTube Music Player",
+  title: "HivePlay",
   description: "A modern music player for YouTube audio",
 };
 

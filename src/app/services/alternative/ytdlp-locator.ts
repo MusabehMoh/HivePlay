@@ -11,7 +11,9 @@ const execPromise = util.promisify(exec);
 // Common installation paths for yt-dlp on different platforms
 const commonPaths = {
   windows: [
-    // Winget installation path
+    // Specific WinGet installation path (most common)
+    path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages', 'yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe'),
+    // General Winget installation path
     path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages'),
     // Chocolatey installation path
     'C:\\ProgramData\\chocolatey\\bin',
@@ -40,15 +42,24 @@ async function findYtDlpInCommonPaths(): Promise<string | null> {
   // First check if it's directly in these paths
   for (const basePath of searchPaths) {
     try {
-      if (isWindows && basePath.includes('WinGet') && fs.existsSync(basePath)) {
-        // For WinGet, we need to search subdirectories
-        const dirs = fs.readdirSync(basePath);
-        for (const dir of dirs) {
-          if (dir.toLowerCase().includes('yt-dlp')) {
-            const fullPath = path.join(basePath, dir, exeName);
-            if (fs.existsSync(fullPath)) {
-              console.log(`[ytdlp-locator] Found yt-dlp at: ${fullPath}`);
-              return fullPath;
+      if (isWindows && basePath.includes('WinGet')) {
+        if (basePath.includes('yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe')) {
+          // Direct path to specific WinGet package
+          const fullPath = path.join(basePath, exeName);
+          if (fs.existsSync(fullPath)) {
+            console.log(`[ytdlp-locator] Found yt-dlp at: ${fullPath}`);
+            return fullPath;
+          }
+        } else if (fs.existsSync(basePath)) {
+          // For general WinGet path, search subdirectories
+          const dirs = fs.readdirSync(basePath);
+          for (const dir of dirs) {
+            if (dir.toLowerCase().includes('yt-dlp')) {
+              const fullPath = path.join(basePath, dir, exeName);
+              if (fs.existsSync(fullPath)) {
+                console.log(`[ytdlp-locator] Found yt-dlp at: ${fullPath}`);
+                return fullPath;
+              }
             }
           }
         }

@@ -8,6 +8,7 @@ import Playlist from "./components/Playlist";
 import PlaylistManager from "./components/PlaylistManager";
 import Toast from './components/Toast';
 import CacheStats from './components/CacheStats';
+import SearchSuggestions from './components/SearchSuggestions';
 import { FaSearch, FaTimes, FaChartBar } from "react-icons/fa";
 
 const MAX_RECENT_SEARCHES = 5;
@@ -70,8 +71,10 @@ export default function Home() {
   const [activePlaylistName, setActivePlaylistName] = useState<string>(DEFAULT_PLAYLIST_NAME);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showCacheStats, setShowCacheStats] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSuggestionRequestRef = useRef<number>(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const SUGGESTION_COOLDOWN = 2000;
 
   const getActivePlaylistItems = useCallback(() => {
@@ -377,6 +380,7 @@ export default function Home() {
 
   const handleClearSearch = () => {
     setSearchQuery("");
+    setShowSuggestions(false);
   };
 
   const handleRecentSearchSelect = (query: string) => {
@@ -396,24 +400,68 @@ export default function Home() {
     localStorage.setItem('recentSearches', JSON.stringify(updated));
   };
 
+  // Search suggestions handlers
+  const handleSearchInputFocus = () => {
+    setShowSuggestions(true);
+  };
+
+  const handleSearchInputBlur = () => {
+    // Delay hiding suggestions to allow for suggestion clicks
+    setTimeout(() => setShowSuggestions(false), 150);
+  };
+
+  const handleSuggestionSelect = (suggestion: string) => {
+    setSearchQuery(suggestion);
+    setShowSuggestions(false);
+    handleSearch(null, suggestion);
+  };
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Show suggestions when user starts typing
+    if (value.trim() || recentSearches.length > 0) {
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setShowSuggestions(false);
+      handleSearch(null);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      searchInputRef.current?.blur();
+    }
+  };
+
   return (
     <div className="min-h-screen pb-28">
       <div className="sticky top-0 z-10 bg-spotify-dark/95 backdrop-blur-md px-4 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex gap-4 items-center">
           <div className="relative flex-grow max-w-2xl">
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch(null);
-                }
-              }}
+              onChange={handleSearchInputChange}
+              onKeyDown={handleSearchInputKeyDown}
+              onFocus={handleSearchInputFocus}
+              onBlur={handleSearchInputBlur}
               placeholder="Search for songs..."
               className="w-full px-4 py-3 bg-spotify-dark-base text-white rounded-full 
                 focus:outline-none focus:ring-2 focus:ring-spotify-green 
                 placeholder:text-gray-500 pr-20"
+            />
+            <SearchSuggestions
+              query={searchQuery}
+              recentSearches={recentSearches}
+              onSelect={handleSuggestionSelect}
+              isVisible={showSuggestions}
+              onClose={() => setShowSuggestions(false)}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
               {searchQuery && (
