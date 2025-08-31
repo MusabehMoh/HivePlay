@@ -1,0 +1,27 @@
+# Node modules and logs
+node_modules
+npm-debug.log
+
+# Next.js build output
+.next
+
+# Local env files
+.env*.local
+
+# Git
+.git
+.gitignore
+
+# Docker files
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Development
+README.md
+*.md
+.vscode/
