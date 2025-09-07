@@ -1,4 +1,4 @@
-'use server';
+
 
 import { executeYtDlp, getYtDlpPath } from './ytdlp-locator';
 import { exec } from 'child_process';
