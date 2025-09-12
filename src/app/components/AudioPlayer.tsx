@@ -1,8 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaForward, FaBackward, FaRedo, FaTimes } from 'react-icons/fa';
-import Image from 'next/image';
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  FaPlay,
+  FaPause,
+  FaVolumeUp,
+  FaVolumeMute,
+  FaForward,
+  FaBackward,
+  FaRedo,
+  FaTimes,
+} from "react-icons/fa";
+import Image from "next/image";
 
 interface AudioPlayerProps {
   videoId: string;
@@ -18,18 +27,24 @@ interface VideoDetails {
   thumbnail: string;
 }
 
-export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, onTogglePlay }: AudioPlayerProps) {
+export default function AudioPlayer({
+  videoId,
+  onEnded,
+  onPrevious,
+  isPlaying,
+  onTogglePlay,
+}: AudioPlayerProps) {
   const [volume, setVolume] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedVolume = localStorage.getItem('ytplayer-volume');
+    if (typeof window !== "undefined") {
+      const savedVolume = localStorage.getItem("ytplayer-volume");
       return savedVolume ? parseInt(savedVolume) : 50;
     }
     return 50;
   });
 
   const [lastUsedVolume, setLastUsedVolume] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedVolume = localStorage.getItem('ytplayer-volume');
+    if (typeof window !== "undefined") {
+      const savedVolume = localStorage.getItem("ytplayer-volume");
       return savedVolume ? parseInt(savedVolume) : 50;
     }
     return 50;
@@ -76,7 +91,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
       currentStep++;
 
       if (audioRef.current) {
-        const newVolume = Math.max(0, startVolume - (volumeStep * currentStep));
+        const newVolume = Math.max(0, startVolume - volumeStep * currentStep);
         audioRef.current.volume = newVolume;
 
         // When fade is complete
@@ -106,36 +121,42 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
   }, [onEnded]);
 
   const toggleFullScreenPlayer = useCallback(() => {
-    setIsFullScreenMode(prev => !prev);
+    setIsFullScreenMode((prev) => !prev);
   }, []);
 
   const handleInternalPlayPause = useCallback(() => {
     onTogglePlay();
   }, [onTogglePlay]);
 
-  const handleProgressChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!audioRef.current) return;
-    const time = parseFloat(e.target.value);
-    audioRef.current.currentTime = time;
-    setCurrentTime(time);
-  }, []);
+  const handleProgressChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!audioRef.current) return;
+      const time = parseFloat(e.target.value);
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    },
+    []
+  );
 
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseInt(e.target.value);
-    setVolume(newVolume);
-    setLastUsedVolume(newVolume);
-    volumeRef.current = newVolume;
+  const handleVolumeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newVolume = parseInt(e.target.value);
+      setVolume(newVolume);
+      setLastUsedVolume(newVolume);
+      volumeRef.current = newVolume;
 
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
-    }
-  }, []);
+      if (audioRef.current) {
+        audioRef.current.volume = newVolume / 100;
+      }
+    },
+    []
+  );
 
   const getFormattedDuration = useCallback((seconds: number): string => {
-    if (isNaN(seconds) || seconds <= 0) return '0:00';
+    if (isNaN(seconds) || seconds <= 0) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   }, []);
 
   useEffect(() => {
@@ -152,8 +173,8 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
       setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
@@ -175,13 +196,15 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
 
   useEffect(() => {
     if (!videoId) return;
-    fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`)
-      .then(res => res.json())
-      .then(data => {
+    fetch(
+      `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
         setVideoInfo({
-          title: data.title || '',
-          channelTitle: data.author_name || '',
-          thumbnail: data.thumbnail_url || '',
+          title: data.title || "",
+          channelTitle: data.author_name || "",
+          thumbnail: data.thumbnail_url || "",
         });
       })
       .catch(() => setVideoInfo(null));
@@ -192,7 +215,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
     if (!audio) return;
 
     if (isPlaying && isReady) {
-      audio.play().catch(error => {
+      audio.play().catch((error) => {
         console.error("[AudioPlayer] audio.play() failed:", error);
       });
     } else if (!isPlaying) {
@@ -203,7 +226,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume / 100;
-      localStorage.setItem('ytplayer-volume', volume.toString());
+      localStorage.setItem("ytplayer-volume", volume.toString());
     }
   }, [volume]);
 
@@ -215,18 +238,26 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
         setVolume(newVolume * 100);
       }
     } else {
-      setVolume(prevVolume => (prevVolume > 0 ? 0 : 50));
+      setVolume((prevVolume) => (prevVolume > 0 ? 0 : 50));
     }
   }, [isIOS]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'mediaSession' in navigator && videoInfo) {
+    if (
+      typeof window !== "undefined" &&
+      "mediaSession" in navigator &&
+      videoInfo
+    ) {
       navigator.mediaSession.metadata = new window.MediaMetadata({
-        title: videoInfo.title || '',
-        artist: videoInfo.channelTitle || '',
+        title: videoInfo.title || "",
+        artist: videoInfo.channelTitle || "",
         artwork: [
-          { src: videoInfo.thumbnail || '', sizes: '512x512', type: 'image/png' }
-        ]
+          {
+            src: videoInfo.thumbnail || "",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
       });
     }
   }, [videoInfo]);
@@ -242,7 +273,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
         const audioDuration = audioRef.current?.duration || 0;
         setDuration(audioDuration);
         setIsReady(true);
-        
+
         // Apply saved volume when audio element is loaded and unmute
         if (audioRef.current) {
           audioRef.current.volume = volumeRef.current / 100;
@@ -263,14 +294,15 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
         if (audioRef.current) {
           const currentTimeValue = audioRef.current.currentTime;
           setCurrentTime(currentTimeValue);
-          
+
           // Check if we're near the end of the track to start fade-out
           // Only if not in repeat mode and fade is not already in progress
-          if (!isRepeatEnabled && 
-              !fadeOutInProgress.current && 
-              audioRef.current.duration > 0 && 
-              currentTimeValue > 0) {
-            
+          if (
+            !isRepeatEnabled &&
+            !fadeOutInProgress.current &&
+            audioRef.current.duration > 0 &&
+            currentTimeValue > 0
+          ) {
             // If track is within 3 seconds of ending, start the fade-out
             const timeRemaining = audioRef.current.duration - currentTimeValue;
             if (timeRemaining <= 3 && timeRemaining > 0) {
@@ -290,14 +322,26 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
     />
   );
 
+  // Dynamic Canvas animation URL per track
+  const canvasUrl = `/api/canvas?videoId=${videoId}`;
+
   if (isFullScreenMode) {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-spotify-dark-elevated to-spotify-dark z-50 overflow-auto">
+        {/* Spotify Canvas-style moving video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          src={canvasUrl}
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-60 blur-sm pointer-events-none z-0"
+        />
         {audioElement}
-        <div className="max-w-3xl mx-auto px-4 flex flex-col h-full">
+        <div className="max-w-3xl mx-auto px-4 flex flex-col h-full relative z-10">
           {/* Top bar with close button */}
           <div className="flex justify-between items-center py-4 md:py-6">
-            <button 
+            <button
               onClick={toggleFullScreenPlayer}
               className="text-gray-400 hover:text-white transition-colors p-2"
             >
@@ -306,7 +350,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
             <h1 className="text-white text-base font-bold">Now Playing</h1>
             <div className="w-5 h-5"></div>
           </div>
-          
+
           {/* Centered content area with album art and controls */}
           <div className="flex-1 flex flex-col items-center justify-center">
             {/* Album art - centered */}
@@ -324,17 +368,17 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                 </div>
               )}
             </div>
-            
+
             {/* Track info - better spacing */}
             <div className="mb-8 text-center w-full px-4">
               <h2 className="text-white text-xl font-bold mb-1">
-                {videoInfo?.title || 'Loading...'}
+                {videoInfo?.title || "Loading..."}
               </h2>
               <p className="text-gray-400 text-base">
-                {videoInfo?.channelTitle || 'Loading...'}
+                {videoInfo?.channelTitle || "Loading..."}
               </p>
             </div>
-            
+
             {/* Progress bar */}
             <div className="w-full max-w-lg px-4 mb-6">
               <div className="flex items-center gap-3 text-sm text-gray-400">
@@ -354,7 +398,11 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                   <div className="absolute inset-0 bg-gray-600 rounded-full h-2 flex items-center">
                     <div
                       className="h-full bg-spotify-green rounded-full relative group-hover:bg-spotify-green"
-                      style={{ width: `${(currentTime / (Math.max(duration, 1))) * 100}%` }}
+                      style={{
+                        width: `${
+                          (currentTime / Math.max(duration, 1)) * 100
+                        }%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -363,14 +411,16 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                 </span>
               </div>
             </div>
-            
+
             {/* Controls section - horizontally center on mobile, shift on desktop */}
             <div className="flex items-center justify-center pb-8 pl-0 md:pl-16">
               <div className="flex items-center">
                 <button
                   onClick={() => setIsRepeatEnabled(!isRepeatEnabled)}
                   className={`p-2 mx-3 text-xl rounded-full transition-colors ${
-                    isRepeatEnabled ? 'text-spotify-green' : 'text-gray-400 hover:text-white'
+                    isRepeatEnabled
+                      ? "text-spotify-green"
+                      : "text-gray-400 hover:text-white"
                   }`}
                 >
                   <FaRedo className="w-5 h-5" />
@@ -402,7 +452,11 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                     onClick={toggleMute}
                     className="text-lg text-gray-400 hover:text-white transition-colors p-2 mr-2"
                   >
-                    {volume === 0 ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                    {volume === 0 ? (
+                      <FaVolumeMute className="w-5 h-5" />
+                    ) : (
+                      <FaVolumeUp className="w-5 h-5" />
+                    )}
                   </button>
                   <div className="w-24 relative h-1 group hidden md:block">
                     <input
@@ -455,7 +509,11 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                   <div className="absolute inset-0 bg-gray-600 rounded-full h-1 flex items-center">
                     <div
                       className="h-full bg-spotify-green rounded-full relative"
-                      style={{ width: `${(currentTime / (Math.max(duration, 1))) * 100}%` }}
+                      style={{
+                        width: `${
+                          (currentTime / Math.max(duration, 1)) * 100
+                        }%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -465,8 +523,8 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
               </div>
               <div className="flex items-center gap-2">
                 {videoInfo?.thumbnail && (
-                  <div 
-                    className="relative h-12 w-12 overflow-hidden rounded flex-shrink-0 cursor-pointer" 
+                  <div
+                    className="relative h-12 w-12 overflow-hidden rounded flex-shrink-0 cursor-pointer"
                     onClick={toggleFullScreenPlayer}
                   >
                     <Image
@@ -479,15 +537,15 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                     />
                   </div>
                 )}
-                <div 
-                  className="min-w-0 flex-grow mr-1 cursor-pointer" 
+                <div
+                  className="min-w-0 flex-grow mr-1 cursor-pointer"
                   onClick={toggleFullScreenPlayer}
                 >
                   <h3 className="text-sm font-medium text-white truncate">
-                    {videoInfo?.title || 'Loading...'}
+                    {videoInfo?.title || "Loading..."}
                   </h3>
                   <p className="text-xs text-gray-400 truncate">
-                    {videoInfo?.channelTitle || 'Loading...'}
+                    {videoInfo?.channelTitle || "Loading..."}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -502,15 +560,32 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                     onClick={handleInternalPlayPause}
                     className={`p-2 rounded-full ${
                       isReady
-                        ? 'bg-spotify-green hover:scale-105'
-                        : 'bg-gray-600 cursor-not-allowed'
+                        ? "bg-spotify-green hover:scale-105"
+                        : "bg-gray-600 cursor-not-allowed"
                     } flex items-center justify-center`}
                     disabled={isStreaming}
                   >
                     {isStreaming ? (
-                      <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#22c55e" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="#22c55e" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      <svg
+                        className="animate-spin"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="#22c55e"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="#22c55e"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
                       </svg>
                     ) : isPlaying ? (
                       <FaPause className="w-5 h-5" />
@@ -530,7 +605,11 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                     className="p-2 text-gray-400 hover:text-white"
                     disabled={!isReady}
                   >
-                    {volume === 0 ? <FaVolumeMute className="w-4 h-4" /> : <FaVolumeUp className="w-4 h-4" />}
+                    {volume === 0 ? (
+                      <FaVolumeMute className="w-4 h-4" />
+                    ) : (
+                      <FaVolumeUp className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -551,7 +630,7 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
           <div className="grid grid-cols-3 items-center gap-4">
             <div className="flex items-center gap-4">
               {videoInfo?.thumbnail && (
-                <div 
+                <div
                   className="relative h-16 w-24 md:w-28 md:h-20 lg:w-32 lg:h-24 overflow-hidden rounded cursor-pointer"
                   onClick={toggleFullScreenPlayer}
                 >
@@ -565,15 +644,15 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                   />
                 </div>
               )}
-              <div 
+              <div
                 className="min-w-0 cursor-pointer"
                 onClick={toggleFullScreenPlayer}
               >
                 <h3 className="text-sm md:text-base font-medium text-white truncate">
-                  {videoInfo?.title || 'Loading...'}
+                  {videoInfo?.title || "Loading..."}
                 </h3>
                 <p className="text-xs md:text-sm text-gray-400 truncate">
-                  {videoInfo?.channelTitle || 'Loading...'}
+                  {videoInfo?.channelTitle || "Loading..."}
                 </p>
               </div>
             </div>
@@ -592,15 +671,32 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                   onClick={handleInternalPlayPause}
                   className={`p-4 rounded-full transition-all ${
                     isReady
-                      ? 'bg-spotify-green hover:scale-110'
-                      : 'bg-gray-600 cursor-not-allowed'
+                      ? "bg-spotify-green hover:scale-110"
+                      : "bg-gray-600 cursor-not-allowed"
                   } flex items-center justify-center`}
                   disabled={isStreaming}
                 >
                   {isStreaming ? (
-                    <svg className="animate-spin" width="24" height="24" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#22c55e" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="#22c55e" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    <svg
+                      className="animate-spin"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="#22c55e"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="#22c55e"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
                     </svg>
                   ) : isPlaying ? (
                     <FaPause className="w-6 h-6" />
@@ -618,7 +714,9 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                 </button>
               </div>
               <div className="w-full flex items-center gap-2 text-xs text-gray-400 h-6">
-                <span className="w-10 text-right flex-shrink-0">{getFormattedDuration(currentTime)}</span>
+                <span className="w-10 text-right flex-shrink-0">
+                  {getFormattedDuration(currentTime)}
+                </span>
                 <div className="flex-grow relative flex items-center h-2 group">
                   <input
                     type="range"
@@ -632,11 +730,17 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                   <div className="absolute inset-0 bg-gray-600 rounded-full h-2 flex items-center">
                     <div
                       className="h-full bg-spotify-green rounded-full relative group-hover:bg-spotify-green"
-                      style={{ width: `${(currentTime / (Math.max(duration, 1))) * 100}%` }}
+                      style={{
+                        width: `${
+                          (currentTime / Math.max(duration, 1)) * 100
+                        }%`,
+                      }}
                     />
                   </div>
                 </div>
-                <span className="w-10 flex-shrink-0">{getFormattedDuration(duration)}</span>
+                <span className="w-10 flex-shrink-0">
+                  {getFormattedDuration(duration)}
+                </span>
               </div>
             </div>
             <div className="flex justify-end items-center gap-2">
@@ -644,7 +748,9 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                 title="Repeat"
                 onClick={() => setIsRepeatEnabled(!isRepeatEnabled)}
                 className={`p-2 rounded-full transition-colors ${
-                  isRepeatEnabled ? 'text-spotify-green bg-spotify-green/20' : 'text-gray-400 hover:text-white'
+                  isRepeatEnabled
+                    ? "text-spotify-green bg-spotify-green/20"
+                    : "text-gray-400 hover:text-white"
                 }`}
                 disabled={!isReady}
               >
@@ -656,7 +762,11 @@ export default function AudioPlayer({ videoId, onEnded, onPrevious, isPlaying, o
                 className="text-gray-400 hover:text-white transition-colors"
                 disabled={!isReady}
               >
-                {volume === 0 ? <FaVolumeMute className="w-4 h-4" /> : <FaVolumeUp className="w-4 h-4" />}
+                {volume === 0 ? (
+                  <FaVolumeMute className="w-4 h-4" />
+                ) : (
+                  <FaVolumeUp className="w-4 h-4" />
+                )}
               </button>
               <div className="w-24 relative h-1 group">
                 <input
