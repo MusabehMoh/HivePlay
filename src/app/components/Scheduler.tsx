@@ -86,7 +86,6 @@ export default function Scheduler({ playlists, onSchedulePlay, searchResults }: 
         console.log(`[Scheduler] Checking item: ${item.name}, Type: ${item.type}, Scheduled: ${scheduledTimeWithSeconds}, Current: ${currentTimeWithSeconds}, Recurring: ${item.isRecurring}`);
 
         let shouldPlay = false;
-        const triggerKey = `${item.id}-${currentDateTime}`;
 
         // Check if we already triggered this item at this exact time
         if (lastTriggeredTimes[item.id] === currentDateTime) {
@@ -98,13 +97,13 @@ export default function Scheduler({ playlists, onSchedulePlay, searchResults }: 
           // Check if today is one of the recurring days and time matches
           const isCorrectDay = item.recurringDays.includes(currentDay);
           const isCorrectTime = currentTime === scheduledTime;
-          const timeDelaySeconds = Math.abs(now.getSeconds() - scheduledDate.getSeconds());
           
-          console.log(`[Scheduler] Recurring check - Day match: ${isCorrectDay}, Time match: ${isCorrectTime}, Current seconds: ${now.getSeconds()}, Scheduled seconds: ${scheduledDate.getSeconds()}, Delay: ${timeDelaySeconds}s, Days: ${item.recurringDays.join(',')}`);
+          console.log(`[Scheduler] Recurring check - Day match: ${isCorrectDay}, Time match: ${isCorrectTime}, Current: ${currentTime}, Scheduled: ${scheduledTime}, Days: ${item.recurringDays.join(',')}`);
           
+          // For recurring schedules, trigger exactly at the scheduled time
           if (isCorrectDay && isCorrectTime) {
             shouldPlay = true;
-            console.log(`[Scheduler] ⏰ TRIGGERING at ${currentTimeWithSeconds} (scheduled for ${scheduledTimeWithSeconds})`);
+            console.log(`[Scheduler] ⏰ Recurring schedule triggered for: ${item.name} at ${currentTimeWithSeconds} (scheduled for ${scheduledTimeWithSeconds})`);
             // Update last triggered time to prevent multiple triggers in the same minute
             setLastTriggeredTimes(prev => ({
               ...prev,
@@ -112,25 +111,34 @@ export default function Scheduler({ playlists, onSchedulePlay, searchResults }: 
             }));
           }
         } else {
-          // One-time schedule - check exact date and time (within 30 second window)
+          // One-time schedule - check exact date and time (only trigger AFTER scheduled time)
           const scheduledDateTime = scheduledDate.getTime();
           const currentDateTimeMs = now.getTime();
-          const timeDiff = Math.abs(currentDateTimeMs - scheduledDateTime);
+          const timeDiff = currentDateTimeMs - scheduledDateTime; // Positive means current time is after scheduled time
           
-          console.log(`[Scheduler] One-time check - Time diff: ${timeDiff}ms (${(timeDiff/1000).toFixed(1)}s), Threshold: 30000ms (30s)`);
+          console.log(`[Scheduler] One-time check - Time diff: ${timeDiff}ms (${(timeDiff/1000).toFixed(1)}s), Threshold: 0-10000ms (0-10s after scheduled time)`);
           
-          // Allow execution within 30 seconds of scheduled time
-          if (timeDiff <= 30000) {
+          // Only trigger if current time is AFTER scheduled time but within 10 seconds
+          if (timeDiff >= 0 && timeDiff <= 10000) {
             shouldPlay = true;
             console.log(`[Scheduler] ⏰ One-time schedule triggered for: ${item.name} at ${currentTimeWithSeconds} (scheduled for ${scheduledTimeWithSeconds})`);
-            // Deactivate one-time schedules after playing
-            setScheduledItems(prev => 
-              prev.map(prevItem => 
-                prevItem.id === item.id 
-                  ? { ...prevItem, isActive: false }
-                  : prevItem
-              )
-            );
+            
+            // Mark as triggered for this exact minute to prevent re-triggering
+            setLastTriggeredTimes(prev => ({
+              ...prev,
+              [item.id]: currentDateTime
+            }));
+            
+            // Deactivate one-time schedules after playing (with delay to ensure it plays)
+            setTimeout(() => {
+              setScheduledItems(prev => 
+                prev.map(prevItem => 
+                  prevItem.id === item.id 
+                    ? { ...prevItem, isActive: false }
+                    : prevItem
+                )
+              );
+            }, 1000); // 1 second delay to ensure playback starts
           }
         }
 
@@ -139,7 +147,7 @@ export default function Scheduler({ playlists, onSchedulePlay, searchResults }: 
           
           try {
             onSchedulePlay(item.itemId, item.type);
-          } catch (error) {
+          } catch {
             console.warn(`[Scheduler] ⚠️ Autoplay blocked for: ${item.name}. User interaction required.`);
             console.warn('Tip: Click anywhere on the page to enable future scheduled playback.');
           }
