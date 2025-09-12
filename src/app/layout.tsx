@@ -26,11 +26,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/hiveplay.png", type: "image/png", sizes: "32x32" },
-      { url: "/hiveplay.png", type: "image/png", sizes: "192x192" }
+      { url: "/hiveplay.png", type: "image/png", sizes: "192x192" },
     ],
     apple: [{ url: "/hiveplay.png" }],
-    shortcut: ["/hiveplay.png"]
-  }
+    shortcut: ["/hiveplay.png"],
+  },
 };
 
 export default function RootLayout({
@@ -42,10 +42,17 @@ export default function RootLayout({
     <html lang="en" className={rajdhani.className}>
       <head>
         {/* Explicit icon links to override default Next.js favicon and bust caches */}
-        <link rel="icon" href="/hiveplay.png?v=2" type="image/png" sizes="32x32" />
+        <link
+          rel="icon"
+          href="/hiveplay.png?v=2"
+          type="image/png"
+          sizes="32x32"
+        />
         <link rel="apple-touch-icon" href="/hiveplay.png?v=2" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
