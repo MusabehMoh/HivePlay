@@ -100,10 +100,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy the yt-dlp update script and startup script
+# Copy the yt-dlp update script
 COPY --chown=nextjs:nodejs docker-update-ytdlp.sh ./docker-update-ytdlp.sh
-COPY --chown=nextjs:nodejs start-hiveplay.sh ./start-hiveplay.sh
-RUN chmod +x ./docker-update-ytdlp.sh ./start-hiveplay.sh
+RUN chmod +x ./docker-update-ytdlp.sh
 
 # Make sure the yt-dlp virtual environment is available in the final stage
 COPY --from=base /opt/venv /opt/venv
@@ -137,4 +136,4 @@ RUN echo '' && \
     echo '╚══════════════════════════════════════════════════════════════════════════════╝' && \
     echo ''
 
-CMD ["./start-hiveplay.sh"]
+CMD ["npm", "start"]
