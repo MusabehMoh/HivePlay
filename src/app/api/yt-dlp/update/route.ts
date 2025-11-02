@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { autoUpdateYtDlp, checkForUpdates } from '../../../services/alternative/yt-dlp-updater';
+import { autoUpdateYtDlp, checkForUpdates, smartAutoUpdate } from '../../../services/alternative/yt-dlp-updater';
+import { checkYtDlp } from '../../../services/alternative/ytdlp-locator';
 import { exec } from 'child_process';
 import util from 'util';
 
@@ -7,10 +8,10 @@ const execPromise = util.promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
-    const { action } = await request.json();
+    const { action, force } = await request.json();
     
     if (action === 'update') {
-      console.log('[yt-dlp Update API] Manual update requested');
+      console.log('[yt-dlp Update API] Manual update requested', force ? '(forced)' : '');
       
       // Check if running in Docker
       const isDocker = process.env.NODE_ENV === 'production' && process.env.REDIS_URL?.includes('redis:');
@@ -25,36 +26,75 @@ export async function POST(request: NextRequest) {
           result = {
             success: true,
             message: `Docker update completed: ${stdout}`,
-            stderr: stderr || undefined
+            stderr: stderr || undefined,
+            environment: 'docker'
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const err = error as Error;
           result = {
             success: false,
-            message: `Docker update failed: ${error.message}`,
-            stderr: error.stderr || undefined
+            message: `Docker update failed: ${err.message}`,
+            stderr: (error as any).stderr || undefined,
+            environment: 'docker'
           };
         }
       } else {
         // Regular environment, use the updater service
         console.log('[yt-dlp Update API] Using regular update service');
-        result = await autoUpdateYtDlp();
+        if (force) {
+          result = await autoUpdateYtDlp();
+        } else {
+          result = await smartAutoUpdate();
+        }
+        result.environment = 'native';
       }
       
       return NextResponse.json(result);
+      
     } else if (action === 'check') {
       console.log('[yt-dlp Update API] Update check requested');
       const updateInfo = await checkForUpdates();
-      return NextResponse.json(updateInfo);
+      const ytdlpStatus = await checkYtDlp();
+      
+      return NextResponse.json({
+        ...updateInfo,
+        available: ytdlpStatus.available,
+        executable: ytdlpStatus.version ? true : false,
+        environment: process.env.NODE_ENV === 'production' && process.env.REDIS_URL?.includes('redis:') ? 'docker' : 'native'
+      });
+      
+    } else if (action === 'status') {
+      console.log('[yt-dlp Update API] Status check requested');
+      const ytdlpStatus = await checkYtDlp();
+      const updateInfo = await checkForUpdates();
+      
+      return NextResponse.json({
+        status: 'ok',
+        ytdlp: {
+          available: ytdlpStatus.available,
+          version: ytdlpStatus.version || 'unknown',
+          executable: ytdlpStatus.version ? true : false
+        },
+        update: {
+          hasUpdate: updateInfo.hasUpdate,
+          currentVersion: updateInfo.currentVersion,
+          latestVersion: updateInfo.latestVersion,
+          daysBehind: updateInfo.daysBehind
+        },
+        environment: process.env.NODE_ENV === 'production' && process.env.REDIS_URL?.includes('redis:') ? 'docker' : 'native',
+        timestamp: new Date().toISOString()
+      });
+      
     } else {
       return NextResponse.json(
-        { error: 'Invalid action. Use "update" or "check".' },
+        { error: 'Invalid action. Use "update", "check", or "status".' },
         { status: 400 }
       );
     }
   } catch (error) {
     console.error('[yt-dlp Update API] Error:', error);
     return NextResponse.json(
-      { error: `Update failed: ${(error as Error).message}` },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }

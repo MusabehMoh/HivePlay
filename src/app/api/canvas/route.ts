@@ -1,10 +1,7 @@
 import { NextRequest } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import os from "os";
 import fs from "fs";
-
-const execAsync = promisify(exec);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url!);
@@ -37,30 +34,119 @@ export async function GET(req: NextRequest) {
   const ytdlpCmd = isWin ? "yt-dlp.exe" : "yt-dlp";
   const ffmpegCmd = isWin ? "ffmpeg.exe" : "ffmpeg";
 
-  // Primary attempt: partial download first 8s directly (requires ffmpeg and is fastest)
+  // Primary attempt: partial download first 8s directly
   try {
-    // Prefer mp4 container as suggested by yt-dlp warning using -t mp4
-    const cmd = `${ytdlpCmd} -t mp4 --download-sections "*00:00-00:08" -o "${outputPath}" https://www.youtube.com/watch?v=${videoId}`;
-    const { stderr } = await execAsync(cmd);
-    if (stderr) console.warn("[Canvas API] yt-dlp (partial) warnings:", stderr);
-  } catch (err) {
-    console.warn(
-      "[Canvas API] Partial download failed, attempting fallback trim...",
-      err
-    );
+    await new Promise<void>((resolve, reject) => {
+      const args = [
+        '-f', 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
+        '--download-sections', '*00:00-00:08',
+        '--no-warnings',
+        '--extractor-retries', '3',
+        '--retries', '3',
+        '--fragment-retries', '3',
+        '-o', outputPath,
+        `https://www.youtube.com/watch?v=${videoId}`
+      ];
 
-    // Fallback: download small mp4, then trim to 8s with ffmpeg
+      const ytdlp = spawn(ytdlpCmd, args, {
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+          NO_COLOR: '1',
+        },
+        shell: true, // CRITICAL: Enables multi-client fallback
+        windowsHide: true,
+        cwd: tempDir
+      });
+
+      let stderr = '';
+      ytdlp.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytdlp.on('close', (code) => {
+        if (code === 0) {
+          console.log(`[Canvas API] ✓ Canvas generated for ${videoId}`);
+          resolve();
+        } else {
+          reject(new Error(`yt-dlp exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      ytdlp.on('error', reject);
+    });
+  } catch (err) {
+    console.warn("[Canvas API] Partial download failed, attempting fallback...");
+
+    // Fallback: download full video then trim with ffmpeg
     const tempInput = `${tempDir}/${videoId}-canvas-src.mp4`;
     try {
-      const dlCmd = `${ytdlpCmd} -f "b[ext=mp4]/best" -o "${tempInput}" https://www.youtube.com/watch?v=${videoId}`;
-      const { stderr: dlStderr } = await execAsync(dlCmd);
-      if (dlStderr)
-        console.warn("[Canvas API] yt-dlp (full) warnings:", dlStderr);
+      // Download full video
+      await new Promise<void>((resolve, reject) => {
+        const args = [
+          '-f', 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
+          '--no-warnings',
+          '--extractor-retries', '3',
+          '--retries', '3',
+          '--fragment-retries', '3',
+          '-o', tempInput,
+          `https://www.youtube.com/watch?v=${videoId}`
+        ];
 
-      const trimCmd = `${ffmpegCmd} -y -loglevel error -i "${tempInput}" -t 8 -c copy "${outputPath}"`;
-      await execAsync(trimCmd);
+        const ytdlp = spawn(ytdlpCmd, args, {
+          env: {
+            ...process.env,
+            PYTHONUNBUFFERED: '1',
+            NO_COLOR: '1',
+          },
+          shell: true,
+          windowsHide: true,
+          cwd: tempDir
+        });
+
+        let stderr = '';
+        ytdlp.stderr?.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        ytdlp.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`yt-dlp failed: ${stderr}`));
+          }
+        });
+
+        ytdlp.on('error', reject);
+      });
+
+      // Trim to 8 seconds with ffmpeg
+      await new Promise<void>((resolve, reject) => {
+        const ffmpeg = spawn(ffmpegCmd, [
+          '-y',
+          '-loglevel', 'error',
+          '-i', tempInput,
+          '-t', '8',
+          '-c', 'copy',
+          outputPath
+        ], {
+          shell: true,
+          windowsHide: true
+        });
+
+        ffmpeg.on('close', (code) => {
+          if (code === 0) {
+            console.log("[Canvas API] ✓ Fallback trim successful");
+            resolve();
+          } else {
+            reject(new Error(`ffmpeg failed with code ${code}`));
+          }
+        });
+
+        ffmpeg.on('error', reject);
+      });
     } catch (fallbackErr) {
-      console.error("[Canvas API] Fallback trim failed:", fallbackErr);
+      console.error("[Canvas API] ✗ Fallback failed:", (fallbackErr as Error).message);
       return new Response("Failed to extract canvas", { status: 500 });
     } finally {
       try {

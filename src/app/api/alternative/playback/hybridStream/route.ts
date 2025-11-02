@@ -7,6 +7,7 @@ import path from 'path';
 import { promisify } from 'util';
 import { createClient } from 'redis';
 import { getYtDlpPath } from '../../../../services/alternative/ytdlp-locator';
+import { autoUpdateWithCooldown, shouldAutoUpdate } from '../../../../services/alternative/yt-dlp-updater';
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -146,16 +147,94 @@ async function streamWithYtDlpRange(videoId: string, range: string | null): Prom
     }
     
     await new Promise<void>((resolve, reject) => {
-      const ytDlp = spawn(ytDlpPath, [
-        '-f', '140',
-        '-o', tempFile,
-        '--quiet',
-        '--no-playlist',
+      // Optimized yt-dlp arguments for reliability
+      const args = [
+        '-f', '140',                    // Format 140 (m4a audio)
+        '-o', tempFile,                 // Output file
+        '--no-playlist',                // Don't download playlists
+        '--no-warnings',                // Suppress warnings
+        '--extractor-retries', '3',     // Retry extraction failures
+        '--retries', '3',               // Retry failed downloads
+        '--fragment-retries', '3',      // Retry failed fragments
         `https://www.youtube.com/watch?v=${videoId}`
-      ]);
-      ytDlp.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`yt-dlp exited with code ${code}`));
+      ];
+      
+      const ytDlp = spawn(ytDlpPath, args, {
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',        // Unbuffered output for real-time logs
+          NO_COLOR: '1',                // Disable ANSI colors
+        },
+        shell: true,                    // Use shell for proper env and multiple client fallback
+        windowsHide: true,              // Hide console window on Windows
+        cwd: os.tmpdir()                // Run in temp directory
+      });
+
+      let stderr = '';
+      
+      ytDlp.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytDlp.on('close', async (code) => {
+        if (code === 0) {
+          console.log(`[HybridStream] ✓ Download successful for ${videoId}`);
+          resolve();
+        } else {
+          const errorMessage = `yt-dlp exited with code ${code}${stderr ? ': ' + stderr : ''}`;
+          console.error(`[HybridStream] ✗ Download failed for ${videoId}: ${errorMessage}`);
+          
+          // Check if we should attempt auto-update (only for extraction errors, not IP blocks)
+          if (shouldAutoUpdate(stderr || errorMessage, code)) {
+            console.log('[HybridStream] ⚠ Extraction error detected, attempting auto-update...');
+            
+            try {
+              const updateResult = await autoUpdateWithCooldown(videoId);
+              
+              if (updateResult.success) {
+                console.log(`[HybridStream] ✓ Auto-update completed: ${updateResult.message}`);
+                
+                // Wait for update to fully apply
+                await new Promise(r => setTimeout(r, 1500));
+                
+                // Retry with same configuration
+                console.log('[HybridStream] Retrying download...');
+                const retryYtDlp = spawn(ytDlpPath, args, {
+                  env: {
+                    ...process.env,
+                    PYTHONUNBUFFERED: '1',
+                    NO_COLOR: '1',
+                  },
+                  shell: true,
+                  windowsHide: true,
+                  cwd: os.tmpdir()
+                });
+
+                let retryStderr = '';
+                retryYtDlp.stderr?.on('data', (data) => {
+                  retryStderr += data.toString();
+                });
+
+                retryYtDlp.on('close', (retryCode) => {
+                  if (retryCode === 0) {
+                    console.log('[HybridStream] ✓ Retry successful after update');
+                    resolve();
+                  } else {
+                    console.error(`[HybridStream] ✗ Retry still failed (code ${retryCode})`);
+                    reject(new Error(`yt-dlp failed after update: ${retryStderr || stderr}`));
+                  }
+                });
+
+                retryYtDlp.on('error', reject);
+                return; // Exit to avoid double rejection
+              }
+            } catch (updateError) {
+              console.error('[HybridStream] Auto-update failed:', updateError);
+            }
+          }
+          
+          reject(new Error(errorMessage));
+        }
       });
       ytDlp.on('error', reject);
     });
