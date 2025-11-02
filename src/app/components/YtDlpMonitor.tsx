@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { showUpdateNotification } from './AutoUpdateNotification';
 
 interface YtDlpMonitorStatus {
@@ -23,8 +23,9 @@ export function useYtDlpMonitor() {
   });
   
   const hasShownUpdateNotification = useRef(false);
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const checkForUpdates = async () => {
+  const checkForUpdates = useCallback(async () => {
     try {
       setStatus(prev => ({ ...prev, isChecking: true }));
       
@@ -45,14 +46,18 @@ export function useYtDlpMonitor() {
           daysBehind: data.daysBehind || null
         });
 
-        // Only show notification if we have confirmed update info (not just GitHub API failure)
-        // Don't show if latestVersion is "unknown" or if daysBehind is very high (likely wrong data)
+        // Only show notification if:
+        // 1. We have confirmed update info (not GitHub API failure)
+        // 2. Haven't shown it before
+        // 3. Latest version is known and valid
+        // 4. Days behind is reasonable (< 60 days)
         if (data.hasUpdate && 
             !hasShownUpdateNotification.current && 
             data.latestVersion && 
             data.latestVersion !== 'unknown' &&
             data.daysBehind && 
-            data.daysBehind < 60) { // Only show if less than 2 months behind
+            data.daysBehind > 0 &&
+            data.daysBehind < 60) {
           
           const message = `yt-dlp update available (${data.daysBehind} days behind)`;
           showUpdateNotification('info', message, `Current: ${data.currentVersion}, Latest: ${data.latestVersion}`);
@@ -61,19 +66,23 @@ export function useYtDlpMonitor() {
       }
     } catch (error) {
       console.error('[yt-dlp-monitor] Failed to check for updates:', error);
-      setStatus(prev => ({ ...prev, isChecking: false }));
+      setStatus(prev => ({ ...prev, isChecking: false, lastCheck: new Date() }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Check on mount
     checkForUpdates();
 
     // Check every 5 minutes
-    const interval = setInterval(checkForUpdates, 5 * 60 * 1000);
+    checkIntervalRef.current = setInterval(checkForUpdates, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, [checkForUpdates]);
 
   return { status, checkForUpdates };
 }
