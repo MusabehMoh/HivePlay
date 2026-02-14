@@ -49,6 +49,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Signal to app code that we're inside a container (used by ytdlp-locator to skip browser cookies)
+ENV DOCKER=1
 
 # Default configuration (override via docker-compose or .env)
 ENV REDIS_URL=redis://redis:6379
