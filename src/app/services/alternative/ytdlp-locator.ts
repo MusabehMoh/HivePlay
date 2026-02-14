@@ -242,7 +242,15 @@ export async function getCookieArgs(): Promise<string[]> {
     return cachedBrowserCookieArgs;
   }
 
-  // 3. On non-Windows, try browsers in order
+  // 3. On non-Windows, try browsers — but skip in Docker/containers (no browsers available)
+  const isContainer = fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv') ||
+    (process.env.container !== undefined) || (process.env.DOCKER === '1');
+  if (isContainer) {
+    console.log('[ytdlp-locator] Running in container — no browser cookies available. Place cookies.txt in project root if needed.');
+    cachedBrowserCookieArgs = [];
+    return cachedBrowserCookieArgs;
+  }
+
   const browsers = ['firefox', 'chrome', 'chromium', 'edge'];
   for (const browser of browsers) {
     try {
