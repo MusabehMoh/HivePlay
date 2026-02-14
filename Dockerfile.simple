@@ -1,0 +1,42 @@
+FROM node:20-slim AS base
+
+LABEL org.opencontainers.image.title="HivePlay"
+LABEL org.opencontainers.image.description="YouTube Music Streaming Platform with Snapcast multi-room casting"
+
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-full python3-venv ffmpeg curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install yt-dlp
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip3 install --no-cache-dir --upgrade pip && pip3 install --no-cache-dir yt-dlp
+RUN yt-dlp --version
+
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
+RUN npm install cheerio
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV NEXT_SKIP_ESLINT=1
+RUN npm run build
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p /app/.next && \
+    chown -R nextjs:nodejs /app
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV REDIS_URL=redis://redis:6379
+ENV SNAPCAST_HOST=""
+ENV SNAPCAST_TCP_PORT=4953
+ENV SNAPCAST_PORT=1705
+
+USER nextjs
+EXPOSE 3000
+
+CMD ["npm", "start"]
