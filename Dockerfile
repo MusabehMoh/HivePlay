@@ -77,6 +77,8 @@ RUN chmod +x ./docker-update-ytdlp.sh
 
 # Make yt-dlp virtual environment available
 COPY --from=base /opt/venv /opt/venv
+# Allow the non-root nextjs user to upgrade yt-dlp at runtime
+RUN chown -R nextjs:nodejs /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 USER nextjs

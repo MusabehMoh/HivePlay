@@ -22,8 +22,58 @@ export function useYtDlpMonitor() {
     daysBehind: null
   });
   
-  const hasShownUpdateNotification = useRef(false);
+  const hasTriggeredUpdate = useRef(false);
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  /** Trigger a server-side auto-update and report result via toast */
+  const triggerAutoUpdate = useCallback(async (currentVersion: string, latestVersion: string, daysBehind: number) => {
+    const dayLabel = `${daysBehind} day${daysBehind === 1 ? '' : 's'} behind`;
+    showUpdateNotification(
+      'updating',
+      'Auto-updating yt-dlp…',
+      `${currentVersion} → ${latestVersion} (${dayLabel})`
+    );
+
+    try {
+      const response = await fetch('/api/yt-dlp/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', force: false })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        if (result.newVersion && result.newVersion !== currentVersion) {
+          showUpdateNotification(
+            'success',
+            'yt-dlp updated successfully',
+            `${currentVersion} → ${result.newVersion}`
+          );
+        } else {
+          // Already up to date (startup update already ran)
+          showUpdateNotification(
+            'success',
+            'yt-dlp is up to date',
+            `Version: ${result.newVersion ?? latestVersion}`
+          );
+        }
+      } else {
+        showUpdateNotification(
+          'error',
+          'yt-dlp auto-update failed',
+          result.message || 'Check server logs for details'
+        );
+      }
+    } catch (err) {
+      console.error('[yt-dlp-monitor] Auto-update request failed:', err);
+      showUpdateNotification(
+        'error',
+        'yt-dlp auto-update failed',
+        'Network error — check server logs'
+      );
+    }
+  }, []);
 
   const checkForUpdates = useCallback(async () => {
     try {
@@ -46,29 +96,26 @@ export function useYtDlpMonitor() {
           daysBehind: data.daysBehind || null
         });
 
-        // Only show notification if:
-        // 1. We have confirmed update info (not GitHub API failure)
-        // 2. Haven't shown it before
-        // 3. Latest version is known and valid
-        // 4. Days behind is reasonable (< 60 days)
-        if (data.hasUpdate && 
-            !hasShownUpdateNotification.current && 
-            data.latestVersion && 
-            data.latestVersion !== 'unknown' &&
-            data.daysBehind && 
-            data.daysBehind > 0 &&
-            data.daysBehind < 60) {
-          
-          const message = `yt-dlp update available (${data.daysBehind} days behind)`;
-          showUpdateNotification('info', message, `Current: ${data.currentVersion}, Latest: ${data.latestVersion}`);
-          hasShownUpdateNotification.current = true;
+        // Auto-update once if we detect an update with valid version info
+        if (
+          data.hasUpdate &&
+          !hasTriggeredUpdate.current &&
+          data.latestVersion &&
+          data.latestVersion !== 'unknown' &&
+          data.currentVersion &&
+          data.daysBehind &&
+          data.daysBehind > 0 &&
+          data.daysBehind < 60
+        ) {
+          hasTriggeredUpdate.current = true;
+          await triggerAutoUpdate(data.currentVersion, data.latestVersion, data.daysBehind);
         }
       }
     } catch (error) {
       console.error('[yt-dlp-monitor] Failed to check for updates:', error);
       setStatus(prev => ({ ...prev, isChecking: false, lastCheck: new Date() }));
     }
-  }, []);
+  }, [triggerAutoUpdate]);
 
   useEffect(() => {
     // Check on mount

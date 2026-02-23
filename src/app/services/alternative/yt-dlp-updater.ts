@@ -455,6 +455,47 @@ export async function smartAutoUpdate(): Promise<UpdateResult> {
   return await autoUpdateYtDlp();
 }
 
+/**
+ * Run a startup update check — called once when the server boots.
+ * Logs every step so the Docker console clearly shows what happened.
+ */
+export async function startupUpdateCheck(): Promise<void> {
+  console.log('[yt-dlp] Startup update check — querying GitHub releases...');
+
+  try {
+    const updateInfo = await checkForUpdates();
+
+    if (!updateInfo.hasUpdate) {
+      console.log(`[yt-dlp] ✓ Up to date (${updateInfo.currentVersion})`);
+      return;
+    }
+
+    const daysBehind = updateInfo.daysBehind
+      ? `${updateInfo.daysBehind} day${updateInfo.daysBehind === 1 ? '' : 's'} behind`
+      : 'update available';
+
+    console.log(
+      `[yt-dlp] Update detected: ${updateInfo.currentVersion} → ${updateInfo.latestVersion} (${daysBehind})`
+    );
+    console.log('[yt-dlp] Starting auto-update...');
+
+    const result = await autoUpdateYtDlp();
+
+    if (result.success) {
+      if (result.oldVersion && result.newVersion && result.oldVersion !== result.newVersion) {
+        console.log(`[yt-dlp] ✓ Successfully updated: ${result.oldVersion} → ${result.newVersion}`);
+      } else {
+        console.log(`[yt-dlp] ✓ Already up to date after update attempt (${result.newVersion})`);
+      }
+    } else {
+      console.error(`[yt-dlp] ✗ Auto-update failed: ${result.message}`);
+      console.error('[yt-dlp]   The app will continue with the current version.');
+    }
+  } catch (error) {
+    console.error('[yt-dlp] ✗ Startup update check threw an error:', (error as Error).message);
+  }
+}
+
 // Cache for tracking recent update attempts to avoid spam
 const updateAttempts = new Map<string, number>();
 const UPDATE_COOLDOWN = 5 * 60 * 1000; // 5 minutes

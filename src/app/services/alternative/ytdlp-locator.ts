@@ -11,12 +11,21 @@ const execPromise = util.promisify(exec);
 // Common installation paths for yt-dlp on different platforms
 const commonPaths = {
   windows: [
-    // Project root directory (where yt-dlp.exe may be bundled)
+    // Project root directory (where yt-dlp.exe may be bundled / downloaded for dev)
     process.cwd(),
+    // update-yt-dlp.ps1 download location
+    path.join(os.homedir(), 'AppData', 'Local', 'yt-dlp'),
     // Specific WinGet installation path (most common)
     path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages', 'yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe'),
     // General Winget installation path
     path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages'),
+    // pip user-install Scripts directories (Python 3.x)
+    path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python313', 'Scripts'),
+    path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'Scripts'),
+    path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'Scripts'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'Python', 'Python313', 'Scripts'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'Python', 'Python312', 'Scripts'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'Python', 'Python311', 'Scripts'),
     // Chocolatey installation path
     'C:\\ProgramData\\chocolatey\\bin',
     // Common user PATH locations

@@ -10,8 +10,9 @@ import Scheduler from "./components/Scheduler";
 import Toast from './components/Toast';
 import CacheStats from './components/CacheStats';
 import SearchSuggestions from './components/SearchSuggestions';
-import { FaSearch, FaTimes, FaChartBar } from "react-icons/fa";
+import { FaSearch, FaTimes, FaChartBar, FaCog } from "react-icons/fa";
 import Image from "next/image";
+import SettingsPanel from "./components/SettingsPanel";
 
 const MAX_RECENT_SEARCHES = 5;
 
@@ -73,6 +74,7 @@ export default function Home() {
   const [activePlaylistName, setActivePlaylistName] = useState<string>(DEFAULT_PLAYLIST_NAME);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showCacheStats, setShowCacheStats] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSuggestionRequestRef = useRef<number>(0);
@@ -520,8 +522,18 @@ export default function Home() {
           >
             <FaChartBar />
           </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className={`p-2 rounded-full ${showSettings ? 'bg-spotify-green text-black' : 'text-gray-400 hover:text-white'}`}
+            aria-label="Open settings"
+            title="Settings"
+          >
+            <FaCog />
+          </button>
         </div>
       </div>
+
+      <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
