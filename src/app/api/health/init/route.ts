@@ -16,9 +16,6 @@ function printBanner() {
   console.log('  ██║  ██║██║ ╚████╔╝ ███████╗██║     ███████╗██║  ██║   ██║   ');
   console.log('  ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ');
   console.log('');
-  console.log('  YouTube Music Streaming  •  Multi-room Snapcast  •  yt-dlp Powered');
-  console.log('  ─────────────────────────────────────────────────────────────────');
-  console.log('');
 }
 
 let monitoringStarted = false;

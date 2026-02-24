@@ -100,27 +100,39 @@ function isDocker(): boolean {
 }
 
 /**
- * Update yt-dlp in Docker using the update script
+ * Update yt-dlp in Docker using pip (the only reliable method for pip-installed packages)
  */
 async function updateInDocker(): Promise<UpdateResult> {
   try {
-    console.log('[yt-dlp-updater] Running Docker update script...');
-    const { stdout, stderr } = await execPromise('bash /app/docker-update-ytdlp.sh');
+    const oldVersion = await getCurrentVersion();
+    console.log('[yt-dlp-updater] Docker environment: upgrading via pip in venv...');
+    await execPromise('/opt/venv/bin/pip install --no-cache-dir --upgrade yt-dlp');
     
-    console.log('[yt-dlp-updater] Docker update output:', stdout);
-    if (stderr) console.log('[yt-dlp-updater] Docker update stderr:', stderr);
+    // Give pip a moment to finish
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const newVersion = await getCurrentVersion();
+    
+    if (oldVersion === newVersion) {
+      return {
+        success: true,
+        message: `yt-dlp is already up to date (${newVersion})`,
+        oldVersion: oldVersion || undefined,
+        newVersion: newVersion || undefined
+      };
+    }
+    
     return {
       success: true,
-      message: `Updated yt-dlp in Docker to ${newVersion}`,
+      message: `Updated yt-dlp from ${oldVersion} to ${newVersion}`,
+      oldVersion: oldVersion || undefined,
       newVersion: newVersion || undefined
     };
   } catch (error) {
-    console.error('[yt-dlp-updater] Docker update failed:', error);
+    console.error('[yt-dlp-updater] Docker pip upgrade failed:', error);
     return {
       success: false,
-      message: `Docker update failed: ${(error as Error).message}`
+      message: `Docker pip upgrade failed: ${(error as Error).message}`
     };
   }
 }
@@ -215,7 +227,14 @@ export async function autoUpdateYtDlp(): Promise<UpdateResult> {
     };
   }
   
-  // Try self-update first (most reliable)
+  // In Docker, yt-dlp is installed via pip — self-update doesn't work for pip packages.
+  // Always use pip directly to upgrade.
+  if (isDocker()) {
+    console.log('[yt-dlp-updater] Docker environment detected, using pip upgrade...');
+    return await updateInDocker();
+  }
+  
+  // Outside Docker: try self-update first (works for standalone binaries)
   console.log('[yt-dlp-updater] Attempting self-update...');
   const selfUpdateResult = await updateWithSelfUpdate();
   

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { autoUpdateYtDlp, checkForUpdates, smartAutoUpdate } from '../../../services/alternative/yt-dlp-updater';
 import { checkYtDlp } from '../../../services/alternative/ytdlp-locator';
-import { exec } from 'child_process';
-import util from 'util';
-
-const execPromise = util.promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,41 +9,14 @@ export async function POST(request: NextRequest) {
     if (action === 'update') {
       console.log('[yt-dlp Update API] Manual update requested', force ? '(forced)' : '');
       
-      // Check if running in Docker
-      const isDocker = process.env.NODE_ENV === 'production' && process.env.REDIS_URL?.includes('redis:');
-      
+      // autoUpdateYtDlp / smartAutoUpdate both detect Docker internally and use pip
       let result;
-      
-      if (isDocker) {
-        // In Docker, use the update script
-        console.log('[yt-dlp Update API] Detected Docker environment, using update script');
-        try {
-          const { stdout, stderr } = await execPromise('./docker-update-ytdlp.sh');
-          result = {
-            success: true,
-            message: `Docker update completed: ${stdout}`,
-            stderr: stderr || undefined,
-            environment: 'docker'
-          };
-        } catch (error: unknown) {
-          const err = error as Error;
-          result = {
-            success: false,
-            message: `Docker update failed: ${err.message}`,
-            stderr: (error as any).stderr || undefined,
-            environment: 'docker'
-          };
-        }
+      if (force) {
+        result = await autoUpdateYtDlp();
       } else {
-        // Regular environment, use the updater service
-        console.log('[yt-dlp Update API] Using regular update service');
-        if (force) {
-          result = await autoUpdateYtDlp();
-        } else {
-          result = await smartAutoUpdate();
-        }
-        result.environment = 'native';
+        result = await smartAutoUpdate();
       }
+      (result as any).environment = process.env.DOCKER === '1' ? 'docker' : 'native';
       
       return NextResponse.json(result);
       
